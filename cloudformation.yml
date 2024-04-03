@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  CloudFormation Template creating a Phone book application. This template creates an Application Load Balancer
+  with an Auto Scaling Group of Amazon Linux 2023 (ami-0c101f26f147fa7fd) EC2 Instances which host a Python Flask Web Application.
+  EC2 instances are placed within a Web Server Security Group which allows HTTP (80) connections only from the ALB's Security Group,
+  and allows TCP (3306) connections only within the instance itself. An RDS MySQL instance is placed within the Web Server's Security Group
+  so that the the Database Server can communicate with the Web Servers. The Application Load Balancer is placed within the ALB Security Group
+  which allows HTTP (80) connections from 0.0.0.0/0. The Web Server Auto Scaling Group is using a
+  Launch Template to spin up instances needed.  The Launch Template is configured to prepare a Python Flask
+  environment on EC2, and to deploy the app on a Flask Server after downloading the app code
+  from a Github repository.
+
+Parameters:
+  MyKeyName:
+    Description: Please enter your key pair
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: "base-ec2.pem"
+
+  Subnets:
+    Description: Pick subnets for load balancer
+    Type: List<AWS::EC2::Subnet::Id>
+
+  VPC:
+    Description: Pick your VPC
+    Type: List<AWS::EC2::VPC::Id>
+    Default: us-east-1
+
+Resources:
+
+  MyALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "String" # Required
+      GroupName: "String"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  MyWebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allows 22 and 80" # Required
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  RDSSecurityGroup:
+    Type: AWS::RDS::DBSecurityGroup
+    Properties:
+      DBSecurityGroupIngress:
+        - EC2SecurityGroupId: !GetAtt MyWebServerSecurityGroup.Id
+      GroupDescription: "MySQL security group" # Required
+
+  MyLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: "ami-0c101f26f147fa7fd"
+        InstanceInitiatedShutdownBehavior: "String"
+        InstanceType: "t2.micro"
+        KeyName: !Ref MyKeyName
+        SecurityGroupIds:
+          - !GetAtt MyWebServerSecurityGroup.GroupId
+        UserData:
+          !Base64 "Fn::Sub"
+            - |
+              #!/bin/bash
+              dnf update -y
+              dnf install git python3-pip -y
+              cd /home/ec2-user
+              echo "${MyRDSURI}" > /home/ec2-user/dbserver.endpoint
+              git clone https://SeattleSlough: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@github.com/SeattleSlough/Clarusway-Phonebook-Application.git app
+              cd app
+              pip install -r requirements.txt
+              python3 phonebook-app.py
+            - MyRDSURI: !GetAtt MySQL.Endpoint.Address
+
+      LaunchTemplateName: "String"
+      TagSpecifications:
+        - ResourceType: instance
+          Tags:
+          - Key: Name
+            Value: !Sub Web Server of ${AWS::StackName} Stack
+
+  MySQLInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: "20"
+      AllowMajorVersionUpgrade: false
+      AutoMinorVersionUpgrade: false
+      BackupRetentionPeriod: 0
+      DBInstanceClass: "db.t3.micro"
+      DBInstanceIdentifier: "String"
+      DBName: "String"
+      DBParameterGroupName: "String"
+      DBSecurityGroups:
+        DBSecurityGroups
+      DBSnapshotIdentifier: "String"
+      DBSubnetGroupName: "String"
+      DedicatedLogVolume: false
+      DeleteAutomatedBackups: false
+      DeletionProtection: false
+      Domain: "String"
+      DomainAuthSecretArn: "String"
+      DomainDnsIps:
+        DomainDnsIps
+      DomainFqdn: "String"
+      DomainIAMRoleName: "String"
+      DomainOu: "String"
+      EnableCloudwatchLogsExports:
+        EnableCloudwatchLogsExports
+      EnableIAMDatabaseAuthentication: false
+      EnablePerformanceInsights: false
+      Endpoint:
+        Address: "String"
+        HostedZoneId: "String"
+        Port: "String"
+      Engine: mysql
+      EngineVersion: 8.0.35
+      Iops: Number
+      KmsKeyId: "String"
+      LicenseModel: "String"
+      ManageMasterUserPassword: false
+      MasterUserPassword: "String"
+      MasterUserSecret:
+        KmsKeyId: "String"
+        SecretArn: "String"
+      MasterUsername: "String"
+      MaxAllocatedStorage: Number
+      MonitoringInterval: Number
+      MonitoringRoleArn: "String"
+      MultiAZ: false
+      NcharCharacterSetName: "String"
+      NetworkType: "String"
+      OptionGroupName: "String"
+      PerformanceInsightsKMSKeyId: "String"
+      PerformanceInsightsRetentionPeriod: Number
+      Port: "String"
+      PreferredBackupWindow: "String"
+      PreferredMaintenanceWindow: "String"
+      ProcessorFeatures:
+        ProcessorFeatures
+      PromotionTier: Number
+      PubliclyAccessible: false
+      ReplicaMode: "String"
+      RestoreTime: "String"
+      SourceDBClusterIdentifier: "String"
+      SourceDBInstanceAutomatedBackupsArn: "String"
+      SourceDBInstanceIdentifier: "String"
+      SourceDbiResourceId: "String"
+      SourceRegion: "String"
+      StorageEncrypted: false
+      StorageThroughput: Number
+      StorageType: "String"
+      Tags:
+        Tags
+      Timezone: "String"
+      UseDefaultProcessorFeatures: false
+      UseLatestRestorableTime: false
+      VPCSecurityGroups:
+        VPCSecurityGroups
+
+  MyALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic: "String"
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        LoadBalancerAttributes
+      Name: "String"
+      Scheme: internet-facing
+      SecurityGroups:
+        - !GetAtt MyWebServerSecurityGroup.GroupId
+      SubnetMappings:
+        - !Ref Subnets
+      Subnets:
+        Subnets
+      Tags:
+        Tags
+      Type: "String"
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions: # Required
+        - TargetGroupArn: !Ref MyTargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref MyALB # Required
+      MutualAuthentication:
+        IgnoreClientCertificateExpiry: false
+        Mode: "String"
+        TrustStoreArn: "String"
+      Port: 80
+      Protocol: HTTP
+
+  MyTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPC
+
+  ASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: "String"
+      AvailabilityZones:
+        AvailabilityZones
+      CapacityRebalance: false
+      Context: "String"
+      Cooldown: "String"
+      DefaultInstanceWarmup: Number
+      DesiredCapacity: "String"
+      DesiredCapacityType: "String"
+      HealthCheckGracePeriod: Number
+      HealthCheckType: "String"
+      InstanceId: "String"
+      InstanceMaintenancePolicy:
+        MaxHealthyPercentage: Number
+        MinHealthyPercentage: Number
+      LaunchConfigurationName: "Number"
+      LaunchTemplate:
+        LaunchTemplateId: "String"
+        LaunchTemplateName: "String"
+        Version: "String"
+      LifecycleHookSpecificationList:
+        LifecycleHookSpecificationList
+      LoadBalancerNames:
+        LoadBalancerNames
+      MaxInstanceLifetime: Number
+      MaxSize: "String" # Required
+      MetricsCollection:
+        MetricsCollection
+      MinSize: "String" # Required
+      MixedInstancesPolicy:
+      NewInstancesProtectedFromScaleIn: false
+      NotificationConfigurations:
+        NotificationConfigurations
+      PlacementGroup: "String"
+      ServiceLinkedRoleARN: "String"
+      Tags:
+        Tags
+      TargetGroupARNs:
+        TargetGroupARNs
+      TerminationPolicies:
+        TerminationPolicies
+      VPCZoneIdentifier:
+        VPCZoneIdentifier
+
+
+Outputs:
+  WebsiteURL:
+    Value: !Sub
+      - http://${ALBAddress}
+      - ALBAddress: !GetAtt ALB.DNSName
+    Description: Phonebook Application ALB URL
