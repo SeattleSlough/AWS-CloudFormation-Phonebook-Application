@@ -14,7 +14,7 @@ Parameters:
   MyKeyName:
     Description: Please enter your key pair
     Type: AWS::EC2::KeyPair::KeyName
-    Default: "base-ec2.pem"
+    Default: "your-key-here.pem"
 
   Subnets:
     Description: Pick subnets for load balancer
@@ -77,7 +77,7 @@ Resources:
               dnf install git python3-pip -y
               cd /home/ec2-user
               echo "${MyRDSURI}" > /home/ec2-user/dbserver.endpoint
-              git clone https://SeattleSlough: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@github.com/SeattleSlough/Clarusway-Phonebook-Application.git app
+              git clone https://SeattleSlough:<token>@github.com/SeattleSlough/Clarusway-Phonebook-Application.git app
               cd app
               pip install -r requirements.txt
               python3 phonebook-app.py
